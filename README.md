@@ -6,7 +6,7 @@ This extension adds support for Fantasy Grounds Unity to Vortex. It currently ha
 
 ### Vortex Install (Easy)
 
-- In Vortex, locate Cities Skylines in the Games tab.
+- In Vortex, locate Fantasy Grounds Unity in the Games tab.
 - Click on the game tile to manage it, install the extension as prompted.
 - Click the prompt to restart Vortex.
 
@@ -20,4 +20,4 @@ This extension adds support for Fantasy Grounds Unity to Vortex. It currently ha
 
 ### Manual Install
 
-- Extract the 7z archive to %appdata%\Vortex\plugins\Cities Skylines
+- Extract the 7z archive to %appdata%\Vortex\plugins\Fantasy Grounds Unity
