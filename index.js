@@ -9,6 +9,7 @@ const GAME_ID = 'fantasygroundsunity';
 const STEAMAPP_ID = '1196310';
 
 const MOD_FILENAME = 'extension.xml'
+const MOD_BUNDLE_EXTENSION = '.ext'
 
 function findModPath() {
   const instPath = winapi.RegGetValue(
@@ -37,13 +38,12 @@ function findGame() {
   }
 }
 
-function installContent(files, destinationPath) {
+function installLooseContent(files, destinationPath) {
   // The .pak file is expected to always be positioned in the mods directory we're going to disregard anything placed outside the root.
-  const modFile = files.find(file => path.basename(file).toLowerCase() === MOD_FILENAME);
+  const modFile = files.find(file => path.basename(file) === MOD_FILENAME);
   const idx = modFile.indexOf(path.basename(modFile));
   const rootPath = path.dirname(modFile);
-
-  console.info("destinationPath: " + destinationPath)
+  const modName = path.basename(destinationPath, '.installing');
   
   // Remove directories and anything that isn't in the rootPath.
   const filtered = files.filter(file => 
@@ -54,17 +54,45 @@ function installContent(files, destinationPath) {
     return {
       type: 'copy',
       source: file,
-      destination: path.join(file.substr(idx)),
+      destination: path.join(modName, file.substr(idx)),
     };
   });
 
   return Promise.resolve({ instructions });
 }
 
-function testSupportedContent(files, gameId) {
+function testSupportedLooseContent(files, gameId) {
   // Make sure we're able to support this mod.
   const supported = (gameId === GAME_ID) &&
     (files.find(file => path.basename(file) === MOD_FILENAME) !== undefined);
+  return Promise.resolve({
+    supported,
+    requiredFiles: [],
+  });
+}
+
+function installBundleContent(files, destinationPath) {
+  // The .ext files in the archive
+  const bundleFiles = files.filter(file => path.extname(file).toLowerCase() === MOD_BUNDLE_EXTENSION);
+  
+  console.info("bundleFiles: " + bundleFiles)
+
+  const instructions = bundleFiles.map(file => {
+    return {
+      type: 'copy',
+      source: file,
+      destination: path.basename(file),
+    };
+  });
+
+  return Promise.resolve({ instructions });
+}
+
+function testSupportedBundleContent(files, gameId) {
+  // Make sure we're able to support this mod.
+  let supported = (gameId === GAME_ID) &&
+    (files.find(file => path.extname(file).toLowerCase() === MOD_BUNDLE_EXTENSION) !== undefined);
+
   return Promise.resolve({
     supported,
     requiredFiles: [],
@@ -77,7 +105,7 @@ function main(context) {
   context.registerGame({
     id: GAME_ID,
     name: 'Fantasy Grounds Unity',
-    mergeMods: false,
+    mergeMods: true,
     queryPath: findGame,
     supportedTools: [],
     queryModPath: findModPath,
@@ -96,7 +124,8 @@ function main(context) {
     },
   });
 
-  context.registerInstaller('fantasygroundsunity-loosemod', 25, testSupportedContent, installContent);
+  context.registerInstaller('fantasygroundsunity-loosemod', 25, testSupportedLooseContent, installLooseContent);
+  context.registerInstaller('fantasygroundsunity-bundlemod', 26, testSupportedBundleContent, installBundleContent);
 
   return true
 }
