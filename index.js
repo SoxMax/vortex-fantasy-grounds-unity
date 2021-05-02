@@ -3,13 +3,15 @@ const path = require('path');
 const { fs, log, util } = require('vortex-api');
 const winapi = require('winapi-bindings');
 
-// Nexus Mods domain for the game. e.g. nexusmods.com/bloodstainedritualofthenight
 const GAME_ID = 'fantasygroundsunity';
 //Steam Application ID, you can get this from https://steamdb.info/apps/
 const STEAMAPP_ID = '1196310';
 
-const MOD_FILENAME = 'extension.xml'
-const MOD_BUNDLE_EXTENSION = '.ext'
+const EXTENSION_FILENAME = 'extension.xml'
+const EXTENSION_BUNDLE_EXTENSION = '.ext'
+
+const MOD_BASE_DIR = findModPath()
+const EXTENSIONS_FOLDER = 'extensions'
 
 function findModPath() {
   const instPath = winapi.RegGetValue(
@@ -17,9 +19,9 @@ function findModPath() {
     'SOFTWARE\\SmiteWorks\\Fantasy Grounds',
     'DataDir');
   if (!instPath) {
-    throw new Error('empty registry key');
+    return path.join(util.getVortexPath('appData'), 'SmiteWorks', 'Fantasy Grounds');
   }
-  return instPath.value + '/extensions';
+  return instPath.value;
 }
 
 function findGame() {
@@ -38,9 +40,17 @@ function findGame() {
   }
 }
 
+function prepareForModding() {
+  // Make sure all the folders we might need exist. 
+  return Promise.all([
+      fs.ensureDirAsync(MOD_BASE_DIR),
+      fs.ensureDirAsync(path.join(MOD_BASE_DIR, EXTENSIONS_FOLDER)),
+  ]);
+}
+
 function installLooseContent(files, destinationPath) {
   // The .pak file is expected to always be positioned in the mods directory we're going to disregard anything placed outside the root.
-  const modFile = files.find(file => path.basename(file) === MOD_FILENAME);
+  const modFile = files.find(file => path.basename(file) === EXTENSION_FILENAME);
   const idx = modFile.indexOf(path.basename(modFile));
   const rootPath = path.dirname(modFile);
   const modName = path.basename(destinationPath, '.installing');
@@ -54,7 +64,7 @@ function installLooseContent(files, destinationPath) {
     return {
       type: 'copy',
       source: file,
-      destination: path.join(modName, file.substr(idx)),
+      destination: path.join(EXTENSIONS_FOLDER, modName, file.substr(idx)),
     };
   });
 
@@ -64,7 +74,7 @@ function installLooseContent(files, destinationPath) {
 function testSupportedLooseContent(files, gameId) {
   // Make sure we're able to support this mod.
   const supported = (gameId === GAME_ID) &&
-    (files.find(file => path.basename(file) === MOD_FILENAME) !== undefined);
+    (files.find(file => path.basename(file) === EXTENSION_FILENAME) !== undefined);
   return Promise.resolve({
     supported,
     requiredFiles: [],
@@ -73,7 +83,7 @@ function testSupportedLooseContent(files, gameId) {
 
 function installBundleContent(files, destinationPath) {
   // The .ext files in the archive
-  const bundleFiles = files.filter(file => path.extname(file).toLowerCase() === MOD_BUNDLE_EXTENSION);
+  const bundleFiles = files.filter(file => path.extname(file).toLowerCase() === EXTENSION_BUNDLE_EXTENSION);
   
   console.info("bundleFiles: " + bundleFiles)
 
@@ -81,7 +91,7 @@ function installBundleContent(files, destinationPath) {
     return {
       type: 'copy',
       source: file,
-      destination: path.basename(file),
+      destination: path.join(EXTENSIONS_FOLDER, path.basename(file))
     };
   });
 
@@ -91,7 +101,7 @@ function installBundleContent(files, destinationPath) {
 function testSupportedBundleContent(files, gameId) {
   // Make sure we're able to support this mod.
   let supported = (gameId === GAME_ID) &&
-    (files.find(file => path.extname(file).toLowerCase() === MOD_BUNDLE_EXTENSION) !== undefined);
+    (files.find(file => path.extname(file).toLowerCase() === EXTENSION_BUNDLE_EXTENSION) !== undefined);
 
   return Promise.resolve({
     supported,
@@ -102,13 +112,16 @@ function testSupportedBundleContent(files, gameId) {
 function main(context) {
   //This is the main function Vortex will run when detecting the game extension. 
 
+  console.log("Mods Dir: " + path.join(util.getVortexPath('appData'), 'Roaming', 'SmiteWorks', 'Fantasy Grounds'))
+
   context.registerGame({
     id: GAME_ID,
     name: 'Fantasy Grounds Unity',
+    setup: prepareForModding,
     mergeMods: true,
     queryPath: findGame,
     supportedTools: [],
-    queryModPath: findModPath,
+    queryModPath: () => MOD_BASE_DIR,
     logo: 'gameart.jpg',
     executable: () => 'FantasyGrounds.exe',
     requiredFiles: [
